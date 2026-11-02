@@ -1,0 +1,51 @@
+@model Client
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <label asp-for="FirstName" class="form-label"></label>
+        <input asp-for="FirstName" class="form-control" />
+        <span asp-validation-for="FirstName" class="text-danger"></span>
+    </div>
+    <div class="col-md-6">
+        <label asp-for="LastName" class="form-label"></label>
+        <input asp-for="LastName" class="form-control" />
+        <span asp-validation-for="LastName" class="text-danger"></span>
+    </div>
+    <div class="col-md-4">
+        <label asp-for="DateOfBirth" class="form-label"></label>
+        <input asp-for="DateOfBirth" class="form-control" />
+        <span asp-validation-for="DateOfBirth" class="text-danger"></span>
+    </div>
+    <div class="col-md-4">
+        <label asp-for="Phone" class="form-label"></label>
+        <input asp-for="Phone" class="form-control" />
+        <span asp-validation-for="Phone" class="text-danger"></span>
+    </div>
+    <div class="col-md-4">
+        <label asp-for="Email" class="form-label"></label>
+        <input asp-for="Email" class="form-control" />
+        <span asp-validation-for="Email" class="text-danger"></span>
+    </div>
+    <div class="col-12">
+        <label asp-for="Address" class="form-label"></label>
+        <input asp-for="Address" class="form-control" />
+        <span asp-validation-for="Address" class="text-danger"></span>
+    </div>
+    <div class="col-md-6">
+        <label asp-for="InjuryType" class="form-label"></label>
+        <input asp-for="InjuryType" class="form-control" placeholder="e.g. Lumbar disc herniation (L4-L5)" />
+        <span asp-validation-for="InjuryType" class="text-danger"></span>
+    </div>
+    <div class="col-md-6">
+        <label asp-for="InjuryDate" class="form-label"></label>
+        <input asp-for="InjuryDate" class="form-control" />
+        <span asp-validation-for="InjuryDate" class="text-danger"></span>
+    </div>
+    <div class="col-12">
+        <label asp-for="InjurySummary" class="form-label"></label>
+        <textarea asp-for="InjurySummary" class="form-control" rows="3"></textarea>
+        <span asp-validation-for="InjurySummary" class="text-danger"></span>
+    </div>
+</div>

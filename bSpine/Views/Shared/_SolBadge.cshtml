@@ -1,0 +1,10 @@
+@model LegalCase
+<span>@Model.StatuteOfLimitationsDate.ToString("MMM d, yyyy")</span>
+@if (Model.IsSolExpired)
+{
+    <span class="badge text-bg-danger ms-1"><i class="bi bi-exclamation-octagon-fill"></i> Expired</span>
+}
+else if (Model.IsSolWarning)
+{
+    <span class="badge text-bg-warning ms-1"><i class="bi bi-exclamation-triangle-fill"></i> @Model.DaysToSol days</span>
+}

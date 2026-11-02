@@ -1,0 +1,22 @@
+@model LegalCase
+@{
+    ViewData["Title"] = "New case";
+}
+
+<h1 class="page-title">New case</h1>
+
+<div class="card bs-card">
+    <div class="card-body">
+        <form asp-action="Create" method="post">
+            <partial name="_Form" model="Model" />
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary">Create case</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

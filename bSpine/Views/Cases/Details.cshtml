@@ -1,0 +1,364 @@
+@model CaseDetailViewModel
+@{
+    var legalCase = Model.Case;
+    ViewData["Title"] = $"Case {legalCase.CaseNumber}";
+
+    bool HasErrors(string prefix) =>
+        ViewData.ModelState.Keys.Any(k => k.StartsWith(prefix, StringComparison.Ordinal));
+
+    var showTreatmentForm = HasErrors("NewTreatment");
+    var showRequestForm = HasErrors("NewRequest");
+    var showNoteForm = HasErrors("NewNote");
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <div>
+        <h1 class="page-title mb-1">
+            Case @legalCase.CaseNumber
+            <span class="badge @legalCase.Status.BadgeClass() align-middle fs-6">@legalCase.Status</span>
+        </h1>
+        <div class="text-muted">
+            Client:
+            @if (legalCase.Client != null)
+            {
+                <a asp-controller="Clients" asp-action="Details" asp-route-id="@legalCase.ClientId">@legalCase.Client.FullName</a>
+            }
+        </div>
+    </div>
+    <div>
+        <a asp-action="Edit" asp-route-id="@legalCase.Id" class="btn btn-outline-primary">Edit</a>
+        <a asp-action="Delete" asp-route-id="@legalCase.Id" class="btn btn-outline-danger">Delete</a>
+        <a asp-action="Index" class="btn btn-outline-secondary">Back to cases</a>
+    </div>
+</div>
+
+@if (legalCase.IsSolExpired)
+{
+    <div class="alert alert-danger">
+        <i class="bi bi-exclamation-octagon-fill"></i>
+        <strong>Statute of limitations expired</strong> on @legalCase.StatuteOfLimitationsDate.ToString("MMM d, yyyy")
+        (@Math.Abs(legalCase.DaysToSol) days ago).
+    </div>
+}
+else if (legalCase.IsSolWarning)
+{
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <strong>SOL warning:</strong> the statute of limitations runs on @legalCase.StatuteOfLimitationsDate.ToString("MMM d, yyyy")
+        (@legalCase.DaysToSol days remaining).
+    </div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="stat-tile">
+            <div class="stat-label">Total billed</div>
+            <div class="stat-value">@Model.TotalBilled.ToString("C")</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat-tile">
+            <div class="stat-label">Total paid</div>
+            <div class="stat-value">@Model.TotalPaid.ToString("C")</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat-tile">
+            <div class="stat-label">Outstanding balance</div>
+            <div class="stat-value">@Model.TotalOutstanding.ToString("C")</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="stat-tile @(Model.LienCount > 0 ? "stat-warn" : "")">
+            <div class="stat-label">Lien balance billed</div>
+            <div class="stat-value">@Model.LienBilled.ToString("C")</div>
+            <div class="stat-sub">@Model.LienCount lien treatment(s)</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card bs-card h-100">
+            <div class="card-header">Case information</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-5">Assigned attorney</dt>
+                    <dd class="col-sm-7">@legalCase.AssignedAttorney</dd>
+                    <dt class="col-sm-5">Paralegal</dt>
+                    <dd class="col-sm-7">@legalCase.Paralegal</dd>
+                    <dt class="col-sm-5">Opened</dt>
+                    <dd class="col-sm-7">@legalCase.OpenedDate.ToString("MMM d, yyyy")</dd>
+                    <dt class="col-sm-5">Statute of limitations</dt>
+                    <dd class="col-sm-7"><partial name="_SolBadge" model="legalCase" /></dd>
+                    <dt class="col-sm-5">Description</dt>
+                    <dd class="col-sm-7">@(legalCase.Description ?? "-")</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card bs-card h-100">
+            <div class="card-header">Claimant</div>
+            <div class="card-body">
+                @if (legalCase.Client != null)
+                {
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5">Name</dt>
+                        <dd class="col-sm-7">@legalCase.Client.FullName (age @legalCase.Client.Age)</dd>
+                        <dt class="col-sm-5">Injury type</dt>
+                        <dd class="col-sm-7">@legalCase.Client.InjuryType</dd>
+                        <dt class="col-sm-5">Injury date</dt>
+                        <dd class="col-sm-7">@legalCase.Client.InjuryDate.ToString("MMM d, yyyy")</dd>
+                        <dt class="col-sm-5">Phone</dt>
+                        <dd class="col-sm-7">@(legalCase.Client.Phone ?? "-")</dd>
+                        <dt class="col-sm-5">Email</dt>
+                        <dd class="col-sm-7">@(legalCase.Client.Email ?? "-")</dd>
+                    </dl>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ---------------- Treatments ---------------- *@
+<div class="card bs-card mb-4" id="treatments">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Treatments and visits</span>
+        <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#treatmentForm">
+            <i class="bi bi-plus-lg"></i> Add treatment
+        </button>
+    </div>
+
+    <div class="collapse @(showTreatmentForm ? "show" : "")" id="treatmentForm">
+        <div class="card-body border-bottom bg-light">
+            <form asp-action="AddTreatment" asp-route-id="@legalCase.Id" method="post">
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <label asp-for="NewTreatment.ProviderId" class="form-label"></label>
+                        <select asp-for="NewTreatment.ProviderId" asp-items="Model.ProviderOptions" class="form-select">
+                            <option value="">-- Select provider --</option>
+                        </select>
+                        <span asp-validation-for="NewTreatment.ProviderId" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="NewTreatment.VisitDate" class="form-label"></label>
+                        <input asp-for="NewTreatment.VisitDate" class="form-control" />
+                        <span asp-validation-for="NewTreatment.VisitDate" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-4">
+                        <label asp-for="NewTreatment.Procedure" class="form-label"></label>
+                        <input asp-for="NewTreatment.Procedure" class="form-control" />
+                        <span asp-validation-for="NewTreatment.Procedure" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="NewTreatment.BilledAmount" class="form-label"></label>
+                        <input asp-for="NewTreatment.BilledAmount" class="form-control" />
+                        <span asp-validation-for="NewTreatment.BilledAmount" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="NewTreatment.PaidAmount" class="form-label"></label>
+                        <input asp-for="NewTreatment.PaidAmount" class="form-control" />
+                        <span asp-validation-for="NewTreatment.PaidAmount" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <div class="form-check mb-2">
+                            <input asp-for="NewTreatment.HasLien" class="form-check-input" />
+                            <label asp-for="NewTreatment.HasLien" class="form-check-label"></label>
+                        </div>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">Save treatment</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Date</th><th>Provider</th><th>Procedure</th>
+                    <th class="text-end">Billed</th><th class="text-end">Paid</th>
+                    <th class="text-end">Outstanding</th><th>Lien</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var t in Model.Treatments)
+            {
+                <tr>
+                    <td class="text-nowrap">@t.VisitDate.ToString("MMM d, yyyy")</td>
+                    <td>@t.Provider?.Name</td>
+                    <td>@t.Procedure</td>
+                    <td class="text-end">@t.BilledAmount.ToString("C")</td>
+                    <td class="text-end">@t.PaidAmount.ToString("C")</td>
+                    <td class="text-end">@t.Outstanding.ToString("C")</td>
+                    <td>
+                        @if (t.HasLien)
+                        {
+                            <span class="badge text-bg-warning">Lien</span>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (!Model.Treatments.Any())
+            {
+                <tr><td colspan="7" class="text-center text-muted py-3">No treatments recorded yet.</td></tr>
+            }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="3">Medical specials</th>
+                    <th class="text-end">@Model.TotalBilled.ToString("C")</th>
+                    <th class="text-end">@Model.TotalPaid.ToString("C")</th>
+                    <th class="text-end">@Model.TotalOutstanding.ToString("C")</th>
+                    <th></th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+@* ---------------- Records requests ---------------- *@
+<div class="card bs-card mb-4" id="requests">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Medical records requests</span>
+        <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#requestForm">
+            <i class="bi bi-plus-lg"></i> Add request
+        </button>
+    </div>
+
+    <div class="collapse @(showRequestForm ? "show" : "")" id="requestForm">
+        <div class="card-body border-bottom bg-light">
+            <form asp-action="AddRequest" asp-route-id="@legalCase.Id" method="post">
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label asp-for="NewRequest.ProviderId" class="form-label"></label>
+                        <select asp-for="NewRequest.ProviderId" asp-items="Model.ProviderOptions" class="form-select">
+                            <option value="">-- Select provider --</option>
+                        </select>
+                        <span asp-validation-for="NewRequest.ProviderId" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="NewRequest.RequestedDate" class="form-label"></label>
+                        <input asp-for="NewRequest.RequestedDate" class="form-control" />
+                        <span asp-validation-for="NewRequest.RequestedDate" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="NewRequest.FollowUpDate" class="form-label"></label>
+                        <input asp-for="NewRequest.FollowUpDate" class="form-control" />
+                        <span asp-validation-for="NewRequest.FollowUpDate" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-3">
+                        <label asp-for="NewRequest.Status" class="form-label"></label>
+                        <select asp-for="NewRequest.Status" asp-items="Html.GetEnumSelectList<RequestStatus>()" class="form-select"></select>
+                        <span asp-validation-for="NewRequest.Status" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="NewRequest.Notes" class="form-label"></label>
+                        <input asp-for="NewRequest.Notes" class="form-control" />
+                        <span asp-validation-for="NewRequest.Notes" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">Save request</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Provider</th><th>Requested</th><th>Status</th>
+                    <th>Follow-up</th><th>Received</th><th>Notes</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var r in Model.Requests)
+            {
+                <tr>
+                    <td>@r.Provider?.Name</td>
+                    <td class="text-nowrap">@r.RequestedDate.ToString("MMM d, yyyy")</td>
+                    <td><span class="badge @r.DisplayStatus.BadgeClass()">@r.DisplayStatus</span></td>
+                    <td class="text-nowrap">@(r.FollowUpDate?.ToString("MMM d, yyyy") ?? "-")</td>
+                    <td class="text-nowrap">@(r.ReceivedDate?.ToString("MMM d, yyyy") ?? "-")</td>
+                    <td>@r.Notes</td>
+                    <td class="text-end">
+                        @if (r.Status != RequestStatus.Received)
+                        {
+                            <form asp-action="MarkRequestReceived" method="post" class="d-inline">
+                                <input type="hidden" name="requestId" value="@r.Id" />
+                                <input type="hidden" name="caseId" value="@legalCase.Id" />
+                                <button type="submit" class="btn btn-sm btn-outline-success">Mark received</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (!Model.Requests.Any())
+            {
+                <tr><td colspan="7" class="text-center text-muted py-3">No records requests yet.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@* ---------------- Notes ---------------- *@
+<div class="card bs-card mb-4" id="notes">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Case notes</span>
+        <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#noteForm">
+            <i class="bi bi-plus-lg"></i> Add note
+        </button>
+    </div>
+
+    <div class="collapse @(showNoteForm ? "show" : "")" id="noteForm">
+        <div class="card-body border-bottom bg-light">
+            <form asp-action="AddNote" asp-route-id="@legalCase.Id" method="post">
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label asp-for="NewNote.Author" class="form-label"></label>
+                        <input asp-for="NewNote.Author" class="form-control" />
+                        <span asp-validation-for="NewNote.Author" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-7">
+                        <label asp-for="NewNote.Text" class="form-label"></label>
+                        <textarea asp-for="NewNote.Text" class="form-control" rows="2"></textarea>
+                        <span asp-validation-for="NewNote.Text" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">Save note</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <ul class="list-group list-group-flush">
+        @foreach (var n in Model.Notes)
+        {
+            <li class="list-group-item">
+                <div class="d-flex justify-content-between">
+                    <strong>@n.Author</strong>
+                    <span class="text-muted small">@n.CreatedAt.ToString("MMM d, yyyy h:mm tt")</span>
+                </div>
+                <div class="note-text">@n.Text</div>
+            </li>
+        }
+        @if (!Model.Notes.Any())
+        {
+            <li class="list-group-item text-center text-muted py-3">No notes yet.</li>
+        }
+    </ul>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
